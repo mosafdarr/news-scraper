@@ -3,7 +3,7 @@ from scrapy import Spider
 
 from pymongo import MongoClient
 
-URI = "mongodb://safdar:pass12@ac-xyuetf6-shard-00-00.jasclyo.mongodb.net:27017,ac-xyuetf6-shard-00-01.jasclyo.mongodb.net:27017,ac-xyuetf6-shard-00-02.jasclyo.mongodb.net:27017/?ssl=true&replicaSet=atlas-w3ovhp-shard-0&authSource=admin&retryWrites=true&w=majority"
+URI = "mongodb://test:test12@ac-26dvanu-shard-00-00.afatcwn.mongodb.net:27017,ac-26dvanu-shard-00-01.afatcwn.mongodb.net:27017,ac-26dvanu-shard-00-02.afatcwn.mongodb.net:27017/?ssl=true&replicaSet=atlas-8etit8-shard-0&authSource=admin&retryWrites=true&w=majority"
 client = MongoClient(URI)
 db = client.news
 
