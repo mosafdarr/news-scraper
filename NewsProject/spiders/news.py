@@ -5,7 +5,7 @@ from pymongo import MongoClient
 
 URI = "mongodb://safdar:pass12@ac-xyuetf6-shard-00-00.jasclyo.mongodb.net:27017,ac-xyuetf6-shard-00-01.jasclyo.mongodb.net:27017,ac-xyuetf6-shard-00-02.jasclyo.mongodb.net:27017/?ssl=true&replicaSet=atlas-w3ovhp-shard-0&authSource=admin&retryWrites=true&w=majority"
 client = MongoClient(URI)
-db = client.newpr
+db = client.news
 
 EXPRESS_COL = db["Express_News"]
 GEO_COL = db["Geo_News"]
@@ -53,52 +53,37 @@ class NewsCrawler(Spider):
         title = response.css("#main-section h1::text").get()
         time = response.css(".left-authorbox span:nth-child(2)::text").get()
         feature_img = response.css(".featured-image-global img::attr(src)").get()
-        description = response.css(".story-text p span::text").getall()
+        description = response.css(".story-text p::text").getall()
         category = ""
 
+        description = self.process_description(description)
         insert_document(EXPRESS_COL, title, time, feature_img, description, category)
 
         yield {
             "title": title,
             "time": time,
             "feature_img": feature_img,
-            "description": self.expnews_description(description),
+            "description": description,
             "category": category,
         }
-
-    def expnews_description(self, desc):
-        new_desc = ""
-        
-        for i in range(len(desc)-7):
-            new_desc += desc[i]
-        
-        return new_desc
 
     def parse_bolnews(self, response):
         title = response.css(".row h1::text").get()
         feature_img = response.css(".featuredimg img::attr(src)").get()
         description = response.css("div.changeMe p::text").getall()
-        time = self.time(response)
+        time = " ".join(response.css(".date::text").get().split(" ")[1:4])
         category = ""
 
+        description = self.process_description(description)
         insert_document(BOL_COL, title, time, feature_img, description, category)
 
         yield {
             "title": title, 
             "feature_img": feature_img,
-            "description": self.process_description(description),
+            "description": description,
             "Category": category,
             "time": time
         }
-    
-    def time(self, response):
-        date = response.css(".date::text").get()
-
-        time = date.split(" ")[-2]
-        ante_meridiem = date.split(" ")[-1]
-
-        return time+ante_meridiem
-
 
     def process_description(self, desc):
         new_desc = ""
@@ -115,12 +100,13 @@ class NewsCrawler(Spider):
         description = response.css("div.story-area .content-area p::text").getall()
         category = response.css("div.column-right a::attr(title)").get()
 
+        description = self.process_description(description)
         insert_document(GEO_COL, title, time, feature_img, description, category)
 
         yield {
             "title": title,
             "time": time.replace("\n", ""),
             "feature_img": feature_img,
-            "description": self.process_description(description),
+            "description": description,
             "category": category,
         }
