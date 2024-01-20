@@ -1,4 +1,28 @@
+from datetime import datetime
 from scrapy import Spider
+
+from pymongo import MongoClient
+
+URI = "mongodb://safdar:pass12@ac-xyuetf6-shard-00-00.jasclyo.mongodb.net:27017,ac-xyuetf6-shard-00-01.jasclyo.mongodb.net:27017,ac-xyuetf6-shard-00-02.jasclyo.mongodb.net:27017/?ssl=true&replicaSet=atlas-w3ovhp-shard-0&authSource=admin&retryWrites=true&w=majority"
+client = MongoClient(URI)
+db = client.newpr
+
+EXPRESS_COL = db["Express_News"]
+GEO_COL = db["Geo_News"]
+BOL_COL = db["Bol News"]
+
+def insert_document(collection, title, time, feature_img, description, category):
+    doc = {
+        "title": title,
+        "time": time,
+        "featured_img": feature_img,
+        "description": description,
+        "category": category
+    }
+
+    inserted = collection.insert_one(doc)
+
+    return inserted
 
 
 class NewsCrawler(Spider):
@@ -9,116 +33,94 @@ class NewsCrawler(Spider):
     def parse(self, response):
         express_css = "li .row > div:first-child div > a:first-child::attr(href)"
 
-        express_nextpage = response.css(".pagination li:nth-child(2) > a::attr(href)").get()
-        express_links = response.css(express_css).getall()
-        geo_links = response.css(".border-box > a::attr(href)").getall()
-        bol_links = response.css(".post-link::attr(href)").getall()
+        express_news = response.css(express_css).getall()
+        geo_news = response.css(".border-box > a::attr(href)").getall()
+        bol_news = response.css(".post-link::attr(href)").getall()
     
-        # if "tribune.com.pk" in response.url:
-        #     for link in express_links:
-        #         yield response.follow(link, callback=self.parse_express_news)
+        if "tribune.com.pk" in response.url:
+            for news in express_news:
+                yield response.follow(news, callback=self.parse_expressnews)
         
-        #     if express_nextpage:
-        #         yield response.follow(express_nextpage, callback=self.parse)
-        
-        # if "geo.tv" in response.url:
-        #     for link in geo_links:
-        #         yield response.follow(link, callback=self.parse_geo_news)
+        if "geo.tv" in response.url:
+            for news in geo_news:
+                yield response.follow(news, callback=self.parse_geonews)
 
         if "bolnews.com" in response.url:
-            for link in bol_links:
-                yield response.follow(link, callback=self.parse_bol_news)
-        
-        
+            for news in bol_news:
+                yield response.follow(news, callback=self.parse_bolnews) 
     
-    def parse_express_news(self, response):
-        headline_css = ".mainstorycontent-parent .story-text > p:nth-child(2)::text"
-    
+    def parse_expressnews(self, response):
         title = response.css("#main-section h1::text").get()
-        headline = response.css(headline_css).get()
         time = response.css(".left-authorbox span:nth-child(2)::text").get()
-        author = response.css(".left-authorbox a::text").get()
         feature_img = response.css(".featured-image-global img::attr(src)").get()
-        description = self.description(response)
-        category = "helo"
-        url = response.url
+        description = response.css(".story-text p span::text").getall()
+        category = ""
 
+        insert_document(EXPRESS_COL, title, time, feature_img, description, category)
 
         yield {
             "title": title,
-            "headline": headline,
             "time": time,
-            "author": author,
             "feature_img": feature_img,
-            "description": description,
+            "description": self.expnews_description(description),
             "category": category,
-            "URL": url,
         }
 
-    def description(self, response):
-        description = response.css(".story-text p span::text").getall()
-        new_description = ""
+    def expnews_description(self, desc):
+        new_desc = ""
         
-        for i in range(len(description)-7):
-            new_description += description[i]
+        for i in range(len(desc)-7):
+            new_desc += desc[i]
         
-        return new_description
+        return new_desc
 
-
-    # def parse_sama_data(self, response):
-    #     title = response.css("#content h1::text").get()
-    #     headline = response.css("p > strong::text").get()
-    #     time = response.css("#content time::text").get()
-    #     author = response.css("#content article strong > a::text")
-    #     feature_img = response.css(".img-frame img::attr(src)").get()
-    #     description = response.css("#content p::text").get
-    #     category = self.sama_category(response)
-    #     url = response.url
-
-    #     yield {
-    #         "title": title,
-    #         "headline": headline,
-    #         "time": time,
-    #         "author": author,
-    #         "feature_img": feature_img,
-    #         "description": description,
-    #         "category": category,
-    #         "URL": url,
-    #     }
-    
-    # def sama_category(self, response):
-    #     category = response.css(".breadcrumbs li::text").get()
-    #     return category.split("|")[0]
-
-    def parse_bol_news(self, response):
+    def parse_bolnews(self, response):
         title = response.css(".row h1::text").get()
         feature_img = response.css(".featuredimg img::attr(src)").get()
         description = response.css("div.changeMe p::text").getall()
-        date = response.css(".date::text").get()
+        time = self.time(response)
+        category = ""
 
+        insert_document(BOL_COL, title, time, feature_img, description, category)
 
         yield {
             "title": title, 
             "feature_img": feature_img,
+            "description": self.process_description(description),
+            "Category": category,
+            "time": time
         }
     
-    def parse_geo_news(self, response):
+    def time(self, response):
+        date = response.css(".date::text").get()
+
+        time = date.split(" ")[-2]
+        ante_meridiem = date.split(" ")[-1]
+
+        return time+ante_meridiem
+
+
+    def process_description(self, desc):
+        new_desc = ""
+
+        for i in range(len(desc)):
+            new_desc += desc[i]
+        
+        return new_desc
+    
+    def parse_geonews(self, response):
         title = response.css("div.story-area h1::text").get()
-        headline = response.css("div.story-area h2::text").get()
-        time = response.css("div.btSubTitle .post-time::text").get()
-        author = response.css("div.btSubTitle .author_title_img a::text").get()
+        time = response.css(".post-time::text").get()
         feature_img = response.css("div.story-area .ui-sortable img::attr(src)").get()
         description = response.css("div.story-area .content-area p::text").getall()
         category = response.css("div.column-right a::attr(title)").get()
-        url = response.url
+
+        insert_document(GEO_COL, title, time, feature_img, description, category)
 
         yield {
             "title": title,
-            "headline": headline,
-            "time": time,
-            "author": author,
+            "time": time.replace("\n", ""),
             "feature_img": feature_img,
-            "description": description,
+            "description": self.process_description(description),
             "category": category,
-            "URL": url,
         }
